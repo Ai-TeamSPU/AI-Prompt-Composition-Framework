@@ -1,0 +1,199 @@
+/* Main App — state, top bar, generate flow, mounting */
+const { useState, useRef, useCallback, useMemo, useEffect } = React;
+
+function App() {
+  const WS = window.WS;
+  const [screen, setScreen] = useState("onboard"); // onboard | builder
+  const [leftTab, setLeftTab] = useState("dept");
+  const [selectedDeptId, setSelectedDeptId] = useState(null);
+  const [genState, setGenState] = useState("idle"); // idle | loading | success
+  const [genStatus, setGenStatus] = useState("");
+  const [layerStatus, setLayerStatus] = useState({});
+  const [blueprint, setBlueprint] = useState(null);
+  const [showOutput, setShowOutput] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  const [ws, setWs] = useState({
+    org: { name: "Demo Enterprise", industry: "General Business", size: "M" },
+    deptIds: [],
+    toolsByDept: {},
+    workflowIds: [],
+    positions: {},
+    agentId: "agent_claude",
+    agentName: "Claude",
+  });
+
+  const nameToId = useMemo(() => {
+    const m = {}; WS.DEPARTMENTS.forEach((d) => (m[d.name] = d.id)); return m;
+  }, []);
+
+  const toastIt = (msg) => { setToast(msg); setTimeout(() => setToast(null), 1600); };
+
+  /* ----- position helper ----- */
+  const nextPos = (existing) => {
+    const n = Object.keys(existing).length;
+    const col = n % 3, row = Math.floor(n / 3);
+    return { x: 24 + col * 224, y: 24 + row * 168 };
+  };
+
+  /* --------------------------------- actions -------------------------------- */
+  const actions = useMemo(() => ({
+    selectDept: (id) => setSelectedDeptId(id),
+    requestToolTab: () => setLeftTab("tool"),
+    addDept: (id) => setWs((p) => {
+      if (p.deptIds.includes(id)) return p;
+      const positions = { ...p.positions, [id]: nextPos(p.positions) };
+      setSelectedDeptId(id);
+      return { ...p, deptIds: [...p.deptIds, id], positions };
+    }),
+    removeDept: (id) => setWs((p) => {
+      const toolsByDept = { ...p.toolsByDept }; delete toolsByDept[id];
+      const positions = { ...p.positions }; delete positions[id];
+      return { ...p, deptIds: p.deptIds.filter((x) => x !== id), toolsByDept, positions };
+    }),
+    toggleTool: (deptId, toolId) => setWs((p) => {
+      const cur = p.toolsByDept[deptId] || [];
+      const next = cur.includes(toolId) ? cur.filter((t) => t !== toolId) : [...cur, toolId];
+      return { ...p, toolsByDept: { ...p.toolsByDept, [deptId]: next } };
+    }),
+    moveDept: (id, x, y) => setWs((p) => ({ ...p, positions: { ...p.positions, [id]: { x, y } } })),
+    autoArrange: () => setWs((p) => {
+      const positions = {};
+      p.deptIds.forEach((id, i) => {
+        const col = i % 3, row = Math.floor(i / 3);
+        positions[id] = { x: 24 + col * 224, y: 24 + row * 168 };
+      });
+      return { ...p, positions };
+    }),
+    toggleWorkflow: (id) => setWs((p) => {
+      const wf = WS.WORKFLOWS.find((w) => w.id === id);
+      if (p.workflowIds.includes(id)) return { ...p, workflowIds: p.workflowIds.filter((x) => x !== id) };
+      let deptIds = [...p.deptIds]; const positions = { ...p.positions };
+      wf.depts.forEach((dn) => {
+        const did = nameToId[dn];
+        if (did && !deptIds.includes(did)) { positions[did] = nextPos(positions); deptIds.push(did); }
+      });
+      return { ...p, workflowIds: [...p.workflowIds, id], deptIds, positions };
+    }),
+    setAgent: (id) => setWs((p) => ({ ...p, agentId: id, agentName: WS.AI_AGENTS.find((a) => a.id === id).name })),
+  }), [nameToId]);
+
+  /* --------------------------------- compile -------------------------------- */
+  const compiled = useMemo(() => WS.compileWorkspace(ws), [ws]);
+
+  /* --------------------------------- generate ------------------------------- */
+  const runGenerate = useCallback(async () => {
+    setGenState("loading");
+    setShowOutput(false);
+    const active = compiled.layers.filter((l) => l.active);
+    const ls = {}; compiled.layers.forEach((l) => (ls[l.id] = "waiting"));
+    setLayerStatus({ ...ls });
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    for (let i = 0; i < active.length; i++) {
+      const l = active[i];
+      setGenStatus(`Layer ${l.order}/12 · ${l.name}`);
+      setLayerStatus((prev) => ({ ...prev, [l.id]: "pending" }));
+      await sleep(90);
+      setLayerStatus((prev) => ({ ...prev, [l.id]: "ready" }));
+      await sleep(60);
+    }
+    setGenStatus("Assembling blueprint…");
+    await sleep(400);
+    const bp = WS.buildBlueprint({ ...compiled.ctx, depts: compiled.deptObjs, tools: compiled.toolObjs, workflows: compiled.workflowObjs });
+    setBlueprint(bp);
+    setGenState("success");
+    setShowOutput(true);
+    await sleep(2000);
+    setGenState("idle");
+  }, [compiled]);
+
+  /* ----------------------------------- steps -------------------------------- */
+  const steps = useMemo(() => {
+    const hasTools = Object.values(ws.toolsByDept).some((a) => a && a.length);
+    return [
+      { key: "org", label: "Organization", state: "done" },
+      { key: "dept", label: "Departments", state: ws.deptIds.length ? "done" : "active" },
+      { key: "tool", label: "Tools", state: hasTools ? "done" : (ws.deptIds.length ? "active" : "idle") },
+      { key: "wf", label: "Workflows", state: ws.workflowIds.length ? "done" : "idle" },
+      { key: "gen", label: "Generate", state: blueprint ? "done" : (ws.deptIds.length ? "active" : "idle") },
+    ];
+  }, [ws, blueprint]);
+
+  /* ----------------------------------- theme -------------------------------- */
+  const [theme, setTheme] = useState("light");
+  useEffect(() => { document.documentElement.setAttribute("data-theme", theme); }, [theme]);
+
+  /* --------------------------------- language ------------------------------- */
+  const [lang, setLang] = useState("en");
+  const t = (k, ...a) => { const v = (window.I18N[lang] && window.I18N[lang][k]) ?? window.I18N.en[k] ?? k; return typeof v === "function" ? v(...a) : v; };
+  useEffect(() => { document.documentElement.lang = lang; }, [lang]);
+
+  if (screen === "onboard") {
+    return <LangCtx.Provider value={lang}><Onboarding lang={lang} onComplete={({ org, deptIds }) => {
+      const positions = {};
+      deptIds.forEach((id, i) => { const col = i % 3, row = Math.floor(i / 3); positions[id] = { x: 24 + col * 224, y: 24 + row * 168 }; });
+      const toolsByDept = {};
+      deptIds.forEach((id) => { const d = WS.DEPARTMENTS.find((x) => x.id === id); if (d) toolsByDept[id] = [...d.default_tools]; });
+      setWs((p) => ({ ...p, org, deptIds, positions, toolsByDept }));
+      setSelectedDeptId(deptIds[0] || null);
+      setScreen("builder");
+    }} /></LangCtx.Provider>;
+  }
+
+  return (
+    <LangCtx.Provider value={lang}>
+    <div className="app">
+      <header className="topbar">
+        <div className="brand">
+          <div className="brand-mark"><Icon name="building" size={17} /></div>
+          <div>
+            <div className="brand-name">AI Workspace Prompt Composer</div>
+            <div className="brand-tag">{ws.org.name} · {industryLabel(ws.org.industry, lang)}</div>
+          </div>
+        </div>
+
+        <div className="steps">
+          {steps.map((s, i) => (
+            <React.Fragment key={s.key}>
+              {i > 0 && <span className="step-sep" />}
+              <div className={"step" + (s.state === "active" ? " active" : s.state === "done" ? " done" : "")}>
+                <span className="step-num">{s.state === "done" ? <Icon name="check" size={11} /> : i + 1}</span>
+                {t("step_" + s.key)}
+              </div>
+            </React.Fragment>
+          ))}
+        </div>
+
+        <div className="tb-actions">
+          <div className="lang-toggle" role="group" aria-label={t("language")}>
+            <button className={"lang-seg" + (lang === "th" ? " active" : "")} onClick={() => setLang("th")}>TH</button>
+            <button className={"lang-seg" + (lang === "en" ? " active" : "")} onClick={() => setLang("en")}>EN</button>
+          </div>
+          <button className="icon-btn" onClick={() => setTheme((t2) => t2 === "light" ? "dark" : "light")} title={t("toggle_theme")}>
+            <Icon name={theme === "light" ? "moon" : "sun"} size={17} />
+          </button>
+          <button className="icon-btn" onClick={() => { setScreen("onboard"); }} title={t("settings")}><Icon name="settings" size={17} /></button>
+        </div>
+      </header>
+
+      <div className="workspace">
+        <LeftPanel ws={ws} actions={actions} selectedDeptId={selectedDeptId} tab={leftTab} setTab={setLeftTab} />
+        <OfficeCanvas ws={ws} actions={actions} selectedDeptId={selectedDeptId} generating={genState === "loading"} genStatus={genStatus} />
+        <RightPanel ws={ws} actions={actions} compiled={compiled} layerStatus={genState === "idle" ? {} : layerStatus} genState={genState} onGenerate={runGenerate} />
+      </div>
+
+      {showOutput && blueprint && (
+        <BlueprintPanel blueprint={blueprint} agentName={ws.agentName} orgName={ws.org.name} depts={compiled.deptObjs}
+          onClose={() => setShowOutput(false)}
+          onRegenerate={() => { setShowOutput(false); runGenerate(); }} />
+      )}
+
+      <TweaksLayer theme={theme} setTheme={setTheme} />
+
+      {toast && <div className="toast">{toast}</div>}
+    </div>
+    </LangCtx.Provider>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
