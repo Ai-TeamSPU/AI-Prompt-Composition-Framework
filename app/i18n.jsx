@@ -44,6 +44,8 @@ const I18N = {
     pixel_intro: "A 16-bit office room per department — copy the image prompt to generate the full scene in your image model.",
     pixel_character: "Character", pixel_screens: "Screens", pixel_tools: "Tools", pixel_walls: "Walls",
     copy_img_prompt: "Copy image prompt",
+    // history
+    history_title: "History", history_empty: "No saved workspaces yet. Click Generate to save your work.", history_clear: "Clear All", history_restore_confirm: "Are you sure you want to restore this workspace? Your current workspace configuration will be overwritten.",
   },
   th: {
     tagline_org: (org, ind) => `${org} · ${ind}`,
@@ -81,6 +83,8 @@ const I18N = {
     pixel_intro: "ห้องออฟฟิศสไตล์ 16-bit ต่อหนึ่งส่วนงาน — คัดลอกพรอมป์ตสร้างภาพเพื่อนำไปสร้างฉากเต็มในโมเดลสร้างภาพของคุณ",
     pixel_character: "ตัวละคร", pixel_screens: "หน้าจอ", pixel_tools: "อุปกรณ์", pixel_walls: "ผนัง",
     copy_img_prompt: "คัดลอกพรอมป์ตสร้างภาพ",
+    // history
+    history_title: "ประวัติ", history_empty: "ยังไม่มีประวัติที่ถูกบันทึก คลิกสร้างระบบเพื่อบันทึกประวัติ", history_clear: "ล้างประวัติทั้งหมด", history_restore_confirm: "คุณแน่ใจหรือไม่ว่าต้องการกู้คืนประวัติชิ้นนี้? การตั้งค่าส่วนงานปัจจุบันบน Canvas จะถูกเขียนทับ",
   },
 };
 

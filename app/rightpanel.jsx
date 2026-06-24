@@ -26,72 +26,74 @@ function RightPanel({ ws, actions, compiled, layerStatus, genState, onGenerate }
 
   return (
     <aside className="panel panel-right">
-      {/* agent selector */}
-      <div className="section">
-        <div className="section-head">
-          <span className="section-title">{t("ai_agent")}</span>
-          <span style={{ fontSize: 10.5, color: "var(--text-hint)" }}>{compiled.agent.style}</span>
-        </div>
-        <div className="agent-grid">
-          {AI_AGENTS.map((a) => (
-            <button key={a.id} className={"agent-btn" + (ws.agentId === a.id ? " sel" : "")} onClick={() => actions.setAgent(a.id)}>
-              <span className="agent-name">{a.name}</span>
-              <span className="agent-prov">{a.provider}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* prompt layers */}
-      <div className="section" style={{ paddingBottom: 10 }}>
-        <div className="section-head">
-          <span className="section-title">{t("prompt_layers")}</span>
-          <span className="count-badge">{t("layer_x12", readyCount)}</span>
-        </div>
-        <div className="layers-list">
-          {compiled.layers.map((l) => {
-            const st = layerStatus[l.id] || (l.active ? "ready" : "waiting");
-            return (
-              <div key={l.id} className={"layer-row" + (l.active ? "" : " inactive")} title={l.purpose}>
-                <span className="layer-order">{l.order}</span>
-                <span className={"layer-dot " + st} />
-                <span className="layer-name">{layerName(l.name, lang)}</span>
-                {l.required ? <span className="layer-req">{t("req")}</span> : <span className="layer-req" style={{ opacity: 0.5 }}>{t("opt")}</span>}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* inspector */}
-      <div className="inspector-wrap">
-        <div className="inspector-head">
-          <div className="insp-tabs">
-            <button className={"insp-tab" + (inspTab === "prompt" ? " active" : "")} onClick={() => setInspTab("prompt")}>{t("t_prompt")}</button>
-            <button className={"insp-tab" + (inspTab === "json" ? " active" : "")} onClick={() => setInspTab("json")}>{t("t_json")}</button>
+      <div className="panel-scroll" style={{ padding: 0, flex: 1, minHeight: 0 }}>
+        {/* agent selector */}
+        <div className="section">
+          <div className="section-head">
+            <span className="section-title">{t("ai_agent")}</span>
+            <span style={{ fontSize: 10.5, color: "var(--text-hint)" }}>{compiled.agent.style}</span>
           </div>
-          <button className={"insp-copy" + (copied ? " copied" : "")} onClick={copy}>
-            <Icon name={copied ? "check" : "copy"} size={13} /> {copied ? t("copied") : t("copy")}
-          </button>
+          <div className="agent-grid">
+            {AI_AGENTS.map((a) => (
+              <button key={a.id} className={"agent-btn" + (ws.agentId === a.id ? " sel" : "")} onClick={() => actions.setAgent(a.id)}>
+                <span className="agent-name">{a.name}</span>
+                <span className="agent-prov">{a.provider}</span>
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="inspector">
-          {inspTab === "prompt" ? (
-            <pre>
-              {compiled.layers.filter((l) => l.active).map((l) => (
-                <React.Fragment key={l.id}>
-                  <span className="ly-head">{`### ${l.order}. ${l.name.toUpperCase()} LAYER`}</span>
-                  {"\n" + l.text + "\n\n"}
-                </React.Fragment>
-              ))}
-              {readyCount === 0 && t("prompt_empty")}
-            </pre>
-          ) : (
-            <pre>{buildJSON()}</pre>
-          )}
+
+        {/* prompt layers */}
+        <div className="section" style={{ paddingBottom: 10 }}>
+          <div className="section-head">
+            <span className="section-title">{t("prompt_layers")}</span>
+            <span className="count-badge">{t("layer_x12", readyCount)}</span>
+          </div>
+          <div className="layers-list">
+            {compiled.layers.map((l) => {
+              const st = layerStatus[l.id] || (l.active ? "ready" : "waiting");
+              return (
+                <div key={l.id} className={"layer-row" + (l.active ? "" : " inactive")} title={l.purpose}>
+                  <span className="layer-order">{l.order}</span>
+                  <span className={"layer-dot " + st} />
+                  <span className="layer-name">{layerName(l.name, lang)}</span>
+                  {l.required ? <span className="layer-req">{t("req")}</span> : <span className="layer-req" style={{ opacity: 0.5 }}>{t("opt")}</span>}
+                </div>
+              );
+            })}
+          </div>
         </div>
-        <div className="insp-foot">
-          <span>{t("chars_n", compiled.master.length)}</span>
-          <span>{t("tokens_n", Math.max(1, Math.round(compiled.master.split(/\s+/).filter(Boolean).length * 1.3)))}</span>
+
+        {/* inspector */}
+        <div className="inspector-wrap">
+          <div className="inspector-head">
+            <div className="insp-tabs">
+              <button className={"insp-tab" + (inspTab === "prompt" ? " active" : "")} onClick={() => setInspTab("prompt")}>{t("t_prompt")}</button>
+              <button className={"insp-tab" + (inspTab === "json" ? " active" : "")} onClick={() => setInspTab("json")}>{t("t_json")}</button>
+            </div>
+            <button className={"insp-copy" + (copied ? " copied" : "")} onClick={copy}>
+              <Icon name={copied ? "check" : "copy"} size={13} /> {copied ? t("copied") : t("copy")}
+            </button>
+          </div>
+          <div className="inspector">
+            {inspTab === "prompt" ? (
+              <pre>
+                {compiled.layers.filter((l) => l.active).map((l) => (
+                  <React.Fragment key={l.id}>
+                    <span className="ly-head">{`### ${l.order}. ${l.name.toUpperCase()} LAYER`}</span>
+                    {"\n" + l.text + "\n\n"}
+                  </React.Fragment>
+                ))}
+                {readyCount === 0 && t("prompt_empty")}
+              </pre>
+            ) : (
+              <pre>{buildJSON()}</pre>
+            )}
+          </div>
+          <div className="insp-foot">
+            <span>{t("chars_n", compiled.master.length)}</span>
+            <span>{t("tokens_n", Math.max(1, Math.round(compiled.master.split(/\s+/).filter(Boolean).length * 1.3)))}</span>
+          </div>
         </div>
       </div>
 

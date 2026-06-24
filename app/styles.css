@@ -541,3 +541,41 @@ input, select, textarea { font-family: inherit; }
 
 .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: var(--text-primary); color: var(--bg-primary); font-size: 12.5px; font-weight: 600; padding: 10px 16px; border-radius: 99px; box-shadow: var(--shadow-pop); z-index: 80; }
 
+/* ----------------------------- History panel ---------------------------- */
+.history-panel {
+  position: relative; width: min(460px, 90vw); height: 100%; background: var(--bg-primary);
+  border-left: 1px solid var(--border); box-shadow: var(--shadow-lg); display: flex; flex-direction: column;
+}
+.history-list {
+  display: flex; flex-direction: column; gap: var(--s3); margin-top: var(--s2);
+}
+.history-card {
+  border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s3); background: var(--bg-secondary);
+  transition: border-color .15s, box-shadow .15s; display: flex; flex-direction: column; gap: 8px;
+}
+.history-card:hover {
+  border-color: var(--border-hover);
+}
+.history-card-header {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s2);
+}
+.history-card-title {
+  font-size: 13.5px; font-weight: 600; color: var(--text-primary);
+}
+.history-card-desc {
+  font-size: 11.5px; color: var(--text-secondary); line-height: 1.4;
+}
+.history-card-actions {
+  display: flex; gap: var(--s2); margin-top: var(--s2); justify-content: flex-end;
+}
+.btn-small-danger {
+  display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: var(--err); padding: 4px 8px; border-radius: var(--r-sm); border: 1px solid color-mix(in srgb, var(--err) 20%, transparent);
+}
+.btn-small-danger:hover {
+  background: color-mix(in srgb, var(--err) 8%, var(--bg-primary));
+}
+.history-empty {
+  text-align: center; color: var(--text-hint); padding: var(--s8) var(--s4); font-size: 13px;
+}
+
+

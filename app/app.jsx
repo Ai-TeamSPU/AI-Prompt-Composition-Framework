@@ -1,6 +1,15 @@
 /* Main App — state, top bar, generate flow, mounting */
 const { useState, useRef, useCallback, useMemo, useEffect } = React;
 
+// Configure localforage for IndexedDB prompt history storage
+if (window.localforage) {
+  window.localforage.config({
+    name: 'AI_Prompt_Composer',
+    storeName: 'prompt_history_store',
+    description: 'ประวัติการสร้าง Blueprint และโครงสร้าง Workspace ขององค์กร'
+  });
+}
+
 function App() {
   const WS = window.WS;
   const [screen, setScreen] = useState("onboard"); // onboard | builder
@@ -12,6 +21,8 @@ function App() {
   const [blueprint, setBlueprint] = useState(null);
   const [showOutput, setShowOutput] = useState(false);
   const [toast, setToast] = useState(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyList, setHistoryList] = useState([]);
 
   const [ws, setWs] = useState({
     org: { name: "Demo Enterprise", industry: "General Business", size: "M" },
@@ -103,9 +114,30 @@ function App() {
     setBlueprint(bp);
     setGenState("success");
     setShowOutput(true);
+
+    // Save to IndexedDB history
+    if (window.localforage) {
+      try {
+        const list = await window.localforage.getItem('promptHistory') || [];
+        const newRecord = {
+          id: Date.now().toString(),
+          title: `Workspace (${ws.org.name})`,
+          description: `${ws.org.industry} · Size: ${ws.org.size} · ${new Date().toLocaleString('th-TH')}`,
+          date: new Date().toISOString(),
+          ws: JSON.parse(JSON.stringify(ws)), // deep clone to preserve current config
+          blueprint: bp
+        };
+        const updatedList = [newRecord, ...list].slice(0, 100);
+        await window.localforage.setItem('promptHistory', updatedList);
+        setHistoryList(updatedList);
+      } catch (err) {
+        console.error("Failed to auto-save history:", err);
+      }
+    }
+
     await sleep(2000);
     setGenState("idle");
-  }, [compiled]);
+  }, [compiled, ws]);
 
   /* ----------------------------------- steps -------------------------------- */
   const steps = useMemo(() => {
@@ -118,6 +150,21 @@ function App() {
       { key: "gen", label: "Generate", state: blueprint ? "done" : (ws.deptIds.length ? "active" : "idle") },
     ];
   }, [ws, blueprint]);
+
+  /* --------------------------------- history -------------------------------- */
+  useEffect(() => {
+    async function loadHistory() {
+      if (window.localforage) {
+        try {
+          const list = await window.localforage.getItem('promptHistory') || [];
+          setHistoryList(list);
+        } catch (err) {
+          console.error("Failed to load history from IndexedDB:", err);
+        }
+      }
+    }
+    loadHistory();
+  }, []);
 
   /* ----------------------------------- theme -------------------------------- */
   const [theme, setTheme] = useState("light");
@@ -172,6 +219,9 @@ function App() {
           <button className="icon-btn" onClick={() => setTheme((t2) => t2 === "light" ? "dark" : "light")} title={t("toggle_theme")}>
             <Icon name={theme === "light" ? "moon" : "sun"} size={17} />
           </button>
+          <button className={"icon-btn" + (showHistory ? " active" : "")} onClick={() => setShowHistory(p => !p)} title={t("history_title")}>
+            <Icon name="history" size={17} />
+          </button>
           <button className="icon-btn" onClick={() => { setScreen("onboard"); }} title={t("settings")}><Icon name="settings" size={17} /></button>
         </div>
       </header>
@@ -188,11 +238,137 @@ function App() {
           onRegenerate={() => { setShowOutput(false); runGenerate(); }} />
       )}
 
+      {showHistory && (
+        <HistoryPanel
+          historyList={historyList}
+          onClose={() => setShowHistory(false)}
+          onRestore={async (item) => {
+            if (confirm(t("history_restore_confirm"))) {
+              setWs(item.ws);
+              setSelectedDeptId(item.ws.deptIds[0] || null);
+              setShowHistory(false);
+              toastIt(lang === "th" ? "กู้คืนการตั้งค่าสำเร็จ!" : "Workspace restored successfully!");
+            }
+          }}
+          onDelete={async (id) => {
+            if (window.localforage) {
+              try {
+                const list = await window.localforage.getItem('promptHistory') || [];
+                const updatedList = list.filter(x => x.id !== id);
+                await window.localforage.setItem('promptHistory', updatedList);
+                setHistoryList(updatedList);
+                toastIt(lang === "th" ? "ลบประวัติเรียบร้อย" : "Deleted history item");
+              } catch (err) {
+                console.error("Failed to delete history item:", err);
+              }
+            }
+          }}
+          onClearAll={async () => {
+            if (confirm(lang === "th" ? "ลบประวัติทั้งหมด?" : "Clear all history?")) {
+              if (window.localforage) {
+                try {
+                  await window.localforage.setItem('promptHistory', []);
+                  setHistoryList([]);
+                  toastIt(lang === "th" ? "ล้างประวัติทั้งหมดเรียบร้อย" : "History cleared");
+                } catch (err) {
+                  console.error("Failed to clear history:", err);
+                }
+              }
+            }
+          }}
+          lang={lang}
+          t={t}
+        />
+      )}
+
       <TweaksLayer theme={theme} setTheme={setTheme} />
 
       {toast && <div className="toast">{toast}</div>}
     </div>
     </LangCtx.Provider>
+  );
+}
+
+function HistoryPanel({ historyList, onClose, onRestore, onDelete, onClearAll, lang, t }) {
+  const [copiedId, setCopiedId] = React.useState(null);
+
+  const handleCopy = (item) => {
+    let fullPrompt = "";
+    if (typeof item.blueprint === "object") {
+      const dataTabs = Object.keys(item.blueprint);
+      fullPrompt = `# ${item.ws.org.name} — Enterprise Blueprint\nGenerated by ${item.ws.agentName}\n\n` + 
+        dataTabs.map((k) => `## ${k}\n\n${item.blueprint[k]}`).join("\n\n");
+    } else {
+      fullPrompt = String(item.blueprint);
+    }
+    
+    navigator.clipboard && navigator.clipboard.writeText(fullPrompt);
+    setCopiedId(item.id);
+    setTimeout(() => setCopiedId(null), 1400);
+  };
+
+  return (
+    <div className="output-overlay" style={{ animation: "fadein 0.2s ease-out" }}>
+      <div className="output-scrim" onClick={onClose} />
+      <div className="history-panel" style={{ animation: "slidein 0.2s ease-out" }}>
+        <div className="output-head">
+          <div className="output-badge" style={{ backgroundColor: "var(--accent-tint)", color: "var(--accent)" }}>
+            <Icon name="history" size={18} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div className="output-h">{t("history_title")}</div>
+            <div className="output-sub">
+              {lang === "th" ? `เก็บประวัติไว้ ${historyList.length} รายการ` : `Saved ${historyList.length} items`}
+            </div>
+          </div>
+          <button className="icon-btn" onClick={onClose}><Icon name="x" size={18} /></button>
+        </div>
+
+        <div className="output-body" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          {historyList.length === 0 ? (
+            <div className="history-empty">
+              {t("history_empty")}
+            </div>
+          ) : (
+            <div className="history-list">
+              {historyList.map((item) => (
+                <div key={item.id} className="history-card">
+                  <div className="history-card-header">
+                    <div>
+                      <div className="history-card-title">{item.title}</div>
+                      <div className="history-card-desc">{item.description}</div>
+                    </div>
+                  </div>
+                  <div className="history-card-actions">
+                    <button className="btn-ghost" onClick={() => onRestore(item)} title={lang === "th" ? "กู้คืนค่านี้" : "Restore config"}>
+                      <Icon name="arrow-right" size={12} style={{ marginRight: 4 }} />
+                      {lang === "th" ? "กู้คืน" : "Restore"}
+                    </button>
+                    <button className="btn-ghost" onClick={() => handleCopy(item)} title={lang === "th" ? "คัดลอกพรอมป์ตสำเร็จรูป" : "Copy full blueprint"}>
+                      <Icon name={copiedId === item.id ? "check" : "copy"} size={12} style={{ marginRight: 4 }} />
+                      {copiedId === item.id ? t("copied") : t("copy")}
+                    </button>
+                    <button className="btn-small-danger" onClick={() => onDelete(item.id)} title={lang === "th" ? "ลบรายการนี้" : "Delete item"}>
+                      <Icon name="x" size={11} style={{ marginRight: 3 }} />
+                      {lang === "th" ? "ลบ" : "Delete"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {historyList.length > 0 && (
+          <div className="output-foot">
+            <button className="btn-small-danger" style={{ cursor: "pointer" }} onClick={onClearAll}>
+              <Icon name="x" size={12} style={{ marginRight: 4 }} />
+              {t("history_clear")}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 

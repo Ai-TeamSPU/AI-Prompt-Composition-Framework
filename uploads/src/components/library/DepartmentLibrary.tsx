@@ -76,7 +76,7 @@ export const DepartmentLibrary = ({ departments, selectedDepartmentId, onAddDepa
         <p className="text-xs font-semibold text-slate-500">Department Library</p>
       </div>
     </div>
-    <div className="grid min-h-0 gap-3 overflow-y-auto p-4">
+    <div className="grid min-h-0 max-h-[600px] gap-3 overflow-y-auto p-4">
       {departments.map((department) => (
         <DraggableDepartment
           key={department.id}

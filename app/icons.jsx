@@ -27,6 +27,7 @@ function Icon({ name, size = 16, stroke = 1.7, style }) {
     case "code": return <svg {...p}><path d="m8 8-4 4 4 4M16 8l4 4-4 4M13 5l-2 14"/></svg>;
     case "rocket": return <svg {...p}><path d="M5 15c-1 1-1.5 4-1.5 4s3-.5 4-1.5M9 14l-3-3a10 10 0 0 1 9-8c2 0 3 .5 3 .5s.5 1 .5 3a10 10 0 0 1-8 9l-3-3"/><circle cx="14" cy="10" r="1.5"/></svg>;
     case "list": return <svg {...p}><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>;
+    case "history": return <svg {...p}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/></svg>;
     default: return <svg {...p}><circle cx="12" cy="12" r="9"/></svg>;
   }
 }
